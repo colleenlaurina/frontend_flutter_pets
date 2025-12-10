@@ -60,7 +60,7 @@ class _PetListingPageState extends State<PetListingPage> {
       if (_selectedTab == 'all-pets') {
         pets = await ApiService.getPetListings();
       } else if (_selectedTab == 'history') {
-        pets = [];
+        pets = await ApiService.getMyAdoptionHistory();
       } else if (_selectedTab == 'my-pets') {
         pets = await ApiService.getMyPets();
       } else if (_selectedTab == 'my-requests') {
@@ -205,6 +205,8 @@ class _PetListingPageState extends State<PetListingPage> {
                     color: const Color(0xFF4FD1C7),
                     child: _selectedTab == 'my-requests'
                         ? _buildRequestsList()
+                        : _selectedTab == 'history'
+                        ? _buildHistoryList()
                         : GridView.builder(
                             padding: const EdgeInsets.all(16),
                             gridDelegate:
@@ -416,6 +418,246 @@ class _PetListingPageState extends State<PetListingPage> {
         }
       }
     }
+  }
+
+  String _formatDate(dynamic date) {
+    if (date == null) return 'Unknown';
+    try {
+      final DateTime parsedDate = DateTime.parse(date.toString());
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return '${months[parsedDate.month - 1]} ${parsedDate.day}, ${parsedDate.year}';
+    } catch (e) {
+      return date.toString();
+    }
+  }
+
+  Widget _buildHistoryList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _pets.length,
+      itemBuilder: (context, index) {
+        final history = _pets[index];
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // Pet Image
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        color: Colors.grey[300],
+                        child: history['image_url'] != null
+                            ? Image.network(
+                                history['image_url'],
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Center(
+                                    child: Icon(
+                                      Icons.pets,
+                                      size: 40,
+                                      color: Color(0xFF4FD1C7),
+                                    ),
+                                  );
+                                },
+                              )
+                            : const Center(
+                                child: Icon(
+                                  Icons.pets,
+                                  size: 40,
+                                  color: Color(0xFF4FD1C7),
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Pet Info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            history['pet_name']?.toString() ?? 'Unknown Pet',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2D3748),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            history['breed']?.toString() ?? 'Unknown breed',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Owner Transfer
+                Row(
+                  children: [
+                    // Original Owner
+                    Expanded(
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: Colors.orange.withOpacity(0.2),
+                            radius: 24,
+                            child: const Icon(
+                              Icons.person_outline,
+                              size: 24,
+                              color: Colors.orange,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            history['original_owner_name']?.toString() ??
+                                'Unknown',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2D3748),
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Original Owner',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Arrow
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Icon(
+                        Icons.arrow_forward,
+                        size: 28,
+                        color: const Color(0xFF4FD1C7),
+                      ),
+                    ),
+
+                    // New Owner
+                    Expanded(
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: const Color(
+                              0xFF4FD1C7,
+                            ).withOpacity(0.2),
+                            radius: 24,
+                            child: const Icon(
+                              Icons.person,
+                              size: 24,
+                              color: Color(0xFF4FD1C7),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            history['new_owner_name']?.toString() ?? 'Unknown',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2D3748),
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'New Owner',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Status
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.green.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Completed on ${_formatDate(history['adoption_date'])}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildTabChip(String label, String value, IconData icon) {

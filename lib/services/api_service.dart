@@ -8,6 +8,7 @@ class ApiService {
 
   static void setToken(String token) {
     _token = token;
+    print('🔑 Token set: ${token.substring(0, 20)}...'); // Debug
   }
 
   static String? getToken() {
@@ -16,6 +17,7 @@ class ApiService {
 
   static void clearToken() {
     _token = null;
+    print('🔓 Token cleared'); // Debug
   }
 
   static Map<String, String> _getHeaders({bool requiresAuth = false}) {
@@ -213,13 +215,23 @@ class ApiService {
     String? imagePath,
   }) async {
     try {
+      print('🚀 Starting pet creation...');
+      print('🔑 Current token: ${_token != null ? "EXISTS" : "NULL"}');
+
+      // Check if token exists first
+      if (_token == null) {
+        throw Exception('Not authenticated - please log in again');
+      }
+
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/pets'));
 
-      if (_token != null) {
-        request.headers['Authorization'] = 'Bearer $_token';
-      }
+      // Add headers
       request.headers['Accept'] = 'application/json';
+      request.headers['Authorization'] = 'Bearer $_token';
 
+      print('🔑 Token being sent: ${_token!.substring(0, 20)}...');
+
+      // Add fields
       request.fields['pet_name'] = petName;
       request.fields['category'] = category;
       if (age != null) request.fields['age'] = age.toString();
@@ -232,28 +244,48 @@ class ApiService {
       request.fields['status'] = status;
       if (allergies != null) request.fields['allergies'] = allergies;
       if (medications != null) request.fields['medications'] = medications;
-      if (foodPreferences != null)
+      if (foodPreferences != null) {
         request.fields['food_preferences'] = foodPreferences;
+      }
 
+      print('📝 Fields added: ${request.fields}');
+
+      // Add image if provided
       if (imagePath != null && imagePath.isNotEmpty) {
+        print('📸 Adding image: $imagePath');
         var file = await http.MultipartFile.fromPath(
           'image',
           imagePath,
           contentType: MediaType('image', 'jpeg'),
         );
         request.files.add(file);
+        print('📸 Image added successfully');
       }
 
+      print('📤 Sending request...');
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
 
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+
       if (response.statusCode == 201 || response.statusCode == 200) {
+        print('✅ Pet created successfully!');
         return jsonDecode(response.body);
+      } else if (response.statusCode == 401) {
+        print('❌ Unauthorized - token may be expired');
+        throw Exception('Unauthorized - please log in again');
+      } else if (response.statusCode == 422) {
+        final error = jsonDecode(response.body);
+        print('❌ Validation error: $error');
+        throw Exception(error['message'] ?? 'Validation failed');
       } else {
         final error = jsonDecode(response.body);
+        print('❌ Error: $error');
         throw Exception(error['message'] ?? 'Failed to create pet listing');
       }
     } catch (e) {
+      print('❌ Exception: $e');
       throw Exception('Error creating pet listing: ${e.toString()}');
     }
   }
@@ -458,6 +490,24 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Connection error: ${e.toString()}');
+    }
+  }
+
+  static Future<List<dynamic>> getMyAdoptionHistory() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/my-adoption-history'),
+        headers: _getHeaders(requiresAuth: true),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data is List ? data : [];
+      } else {
+        throw Exception('Failed to load adoption history');
+      }
+    } catch (e) {
+      throw Exception('Error: ${e.toString()}');
     }
   }
 }
