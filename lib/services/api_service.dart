@@ -1,26 +1,70 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:typed_data';
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
-  static String? _token;
+  // static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static const String baseUrl = 'http://172.20.10.9:8000/api';
 
-  static void setToken(String token) {
-    _token = token;
-    print('🔑 Token set: ${token.substring(0, 20)}...'); // Debug
+  static String? _token;
+  static bool _initialized = false;
+
+  static Future<void> initialize() async {
+    if (_initialized) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _token = prefs.getString('auth_token');
+      _initialized = true;
+
+      if (_token != null) {
+        print('✅ Token loaded from storage');
+      } else {
+        print('⚠️ No token found');
+      }
+    } catch (e) {
+      print('❌ Error loading token: $e');
+    }
+  }
+
+  static Future<void> saveToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
+      _token = token;
+      print('✅ Token saved: ${token.substring(0, 20)}...');
+    } catch (e) {
+      print('❌ Error saving token: $e');
+    }
   }
 
   static String? getToken() {
     return _token;
   }
 
-  static void clearToken() {
-    _token = null;
-    print('🔓 Token cleared'); // Debug
+  static Future<bool> isAuthenticated() async {
+    await initialize();
+    return _token != null && _token!.isNotEmpty;
   }
 
-  static Map<String, String> _getHeaders({bool requiresAuth = false}) {
+  static Future<void> clearToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+      _token = null;
+      print('✅ Token cleared');
+    } catch (e) {
+      print('❌ Error clearing token: $e');
+    }
+  }
+
+  static Future<Map<String, String>> _getHeaders({
+    bool requiresAuth = false,
+  }) async {
+    await initialize();
+
     final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -42,9 +86,10 @@ class ApiService {
     String role = 'user',
   }) async {
     try {
+      final headers = await _getHeaders();
       final response = await http.post(
         Uri.parse('$baseUrl/register'),
-        headers: _getHeaders(),
+        headers: headers,
         body: jsonEncode({
           'name': name,
           'email': email,
@@ -55,7 +100,11 @@ class ApiService {
       );
 
       if (response.statusCode == 201) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        if (data['token'] != null) {
+          await saveToken(data['token']);
+        }
+        return data;
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['message'] ?? 'Registration failed');
@@ -70,9 +119,10 @@ class ApiService {
     required String password,
   }) async {
     try {
+      final headers = await _getHeaders();
       final response = await http.post(
         Uri.parse('$baseUrl/login'),
-        headers: _getHeaders(),
+        headers: headers,
         body: jsonEncode({'email': email, 'password': password}),
       );
 
@@ -80,9 +130,9 @@ class ApiService {
         final data = jsonDecode(response.body);
 
         if (data['token'] != null) {
-          setToken(data['token']);
+          await saveToken(data['token']);
         } else if (data['data'] != null && data['data']['token'] != null) {
-          setToken(data['data']['token']);
+          await saveToken(data['data']['token']);
         }
 
         return data;
@@ -97,13 +147,14 @@ class ApiService {
 
   static Future<Map<String, dynamic>> logout() async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.post(
         Uri.parse('$baseUrl/logout'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
-        clearToken();
+        await clearToken();
         return jsonDecode(response.body);
       } else {
         throw Exception('Logout failed');
@@ -115,9 +166,10 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getCurrentUser() async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.get(
         Uri.parse('$baseUrl/me'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -152,10 +204,19 @@ class ApiService {
         url += '?${queryParams.join('&')}';
       }
 
-      final response = await http.get(Uri.parse(url), headers: _getHeaders());
+      final headers = await _getHeaders();
+      final response = await http.get(Uri.parse(url), headers: headers);
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+
+        // ADD THIS: Check if response has a 'data' key
+        if (data is Map && data['data'] != null) {
+          return data['data'];
+        }
+
+        // If it's already a list, return it
+        return data is List ? data : [];
       } else {
         throw Exception('Failed to load pet listings');
       }
@@ -166,13 +227,22 @@ class ApiService {
 
   static Future<List<dynamic>> getMyPets() async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.get(
         Uri.parse('$baseUrl/my-pets'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+
+        // ADD THIS: Check if response has a 'data' key
+        if (data is Map && data['data'] != null) {
+          return data['data'];
+        }
+
+        // If it's already a list, return it
+        return data is List ? data : [];
       } else {
         throw Exception('Failed to load your pets');
       }
@@ -183,9 +253,10 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getPetById(int id) async {
     try {
+      final headers = await _getHeaders();
       final response = await http.get(
         Uri.parse('$baseUrl/pets/$id'),
-        headers: _getHeaders(),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -212,26 +283,25 @@ class ApiService {
     String? allergies,
     String? medications,
     String? foodPreferences,
-    String? imagePath,
+    Uint8List? imageBytes,
+    String? imageFileName,
   }) async {
     try {
+      await initialize();
       print('🚀 Starting pet creation...');
       print('🔑 Current token: ${_token != null ? "EXISTS" : "NULL"}');
 
-      // Check if token exists first
       if (_token == null) {
         throw Exception('Not authenticated - please log in again');
       }
 
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/pets'));
 
-      // Add headers
       request.headers['Accept'] = 'application/json';
       request.headers['Authorization'] = 'Bearer $_token';
 
       print('🔑 Token being sent: ${_token!.substring(0, 20)}...');
 
-      // Add fields
       request.fields['pet_name'] = petName;
       request.fields['category'] = category;
       if (age != null) request.fields['age'] = age.toString();
@@ -250,12 +320,12 @@ class ApiService {
 
       print('📝 Fields added: ${request.fields}');
 
-      // Add image if provided
-      if (imagePath != null && imagePath.isNotEmpty) {
-        print('📸 Adding image: $imagePath');
-        var file = await http.MultipartFile.fromPath(
+      if (imageBytes != null && imageBytes.isNotEmpty) {
+        print('📸 Adding image from bytes (${imageBytes.length} bytes)');
+        var file = http.MultipartFile.fromBytes(
           'image',
-          imagePath,
+          imageBytes,
+          filename: imageFileName ?? 'pet_image.jpg',
           contentType: MediaType('image', 'jpeg'),
         );
         request.files.add(file);
@@ -307,9 +377,10 @@ class ApiService {
     String? foodPreferences,
   }) async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.post(
         Uri.parse('$baseUrl/pets/$id'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
         body: jsonEncode({
           'pet_name': petName,
           'category': category,
@@ -340,9 +411,10 @@ class ApiService {
 
   static Future<Map<String, dynamic>> deletePetListing(int id) async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.delete(
         Uri.parse('$baseUrl/pets/$id'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -356,15 +428,15 @@ class ApiService {
     }
   }
 
-  // ADOPTION REQUESTS
   static Future<Map<String, dynamic>> createAdoptionRequest({
     required int petId,
     required String message,
   }) async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.post(
         Uri.parse('$baseUrl/adoption-requests'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
         body: jsonEncode({'pet_id': petId, 'message': message}),
       );
 
@@ -381,9 +453,10 @@ class ApiService {
 
   static Future<List<dynamic>> getMyAdoptionRequests() async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.get(
         Uri.parse('$baseUrl/my-adoption-requests'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -402,13 +475,25 @@ class ApiService {
 
   static Future<List<dynamic>> getMyPetRequests() async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.get(
         Uri.parse('$baseUrl/my-pet-requests'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+
+        // ✅ ADD THESE LINES
+        print('🔍 Raw pet requests response: $data');
+
+        if (data['data'] != null) {
+          return data['data'];
+        }
+        if (data['requests'] != null) {
+          return data['requests'];
+        }
+
         return data is List ? data : [];
       } else {
         throw Exception('Failed to load pet requests');
@@ -420,9 +505,10 @@ class ApiService {
 
   static Future<Map<String, dynamic>> cancelAdoptionRequest(int id) async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.delete(
         Uri.parse('$baseUrl/adoption-requests/$id'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -437,9 +523,10 @@ class ApiService {
 
   static Future<Map<String, dynamic>> approveAdoptionRequest(int id) async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.post(
         Uri.parse('$baseUrl/pet-requests/$id/approve'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
         body: jsonEncode({}),
       );
 
@@ -459,10 +546,13 @@ class ApiService {
     String? reason,
   }) async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.post(
         Uri.parse('$baseUrl/pet-requests/$id/reject'),
-        headers: _getHeaders(requiresAuth: true),
-        body: jsonEncode(reason != null ? {'reason': reason} : {}),
+        headers: headers,
+        body: jsonEncode({
+          'owner_notes': reason ?? '', // ✅ CHANGED: Send owner_notes instead
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -478,9 +568,10 @@ class ApiService {
 
   static Future<Map<String, dynamic>> testConnection() async {
     try {
+      final headers = await _getHeaders();
       final response = await http.get(
         Uri.parse('$baseUrl/test'),
-        headers: _getHeaders(),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -495,9 +586,10 @@ class ApiService {
 
   static Future<List<dynamic>> getMyAdoptionHistory() async {
     try {
+      final headers = await _getHeaders(requiresAuth: true);
       final response = await http.get(
         Uri.parse('$baseUrl/my-adoption-history'),
-        headers: _getHeaders(requiresAuth: true),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {

@@ -16,10 +16,8 @@ class _PetListingPageState extends State<PetListingPage> {
   List<dynamic> _pets = [];
   bool _isLoading = true;
   String _selectedTab = 'all-pets';
-  int? _currentUserId; // Track current user's ID
-
-  // Cache for different tabs to avoid reloading
-  Map<String, List<dynamic>> _cachedData = {};
+  int? _currentUserId;
+  final Map<String, List<dynamic>> _cachedData = {};
 
   @override
   void initState() {
@@ -34,14 +32,12 @@ class _PetListingPageState extends State<PetListingPage> {
       setState(() {
         _currentUserId = user['id'];
       });
-      print('🔑 Current user ID: $_currentUserId');
     } catch (e) {
       print('❌ Error loading current user: $e');
     }
   }
 
   Future<void> _loadPets({bool forceRefresh = false}) async {
-    // Check if we have cached data and it's not a force refresh
     if (!forceRefresh && _cachedData.containsKey(_selectedTab)) {
       setState(() {
         _pets = _cachedData[_selectedTab]!;
@@ -54,8 +50,6 @@ class _PetListingPageState extends State<PetListingPage> {
     });
 
     try {
-      print('🔍 Fetching ${_selectedTab} from API...');
-
       List<dynamic> pets;
       if (_selectedTab == 'all-pets') {
         pets = await ApiService.getPetListings();
@@ -64,24 +58,19 @@ class _PetListingPageState extends State<PetListingPage> {
       } else if (_selectedTab == 'my-pets') {
         pets = await ApiService.getMyPets();
       } else if (_selectedTab == 'my-requests') {
-        // Load user's adoption requests
         pets = await ApiService.getMyAdoptionRequests();
       } else if (_selectedTab == 'pet-requests') {
-        pets = [];
+        pets = await ApiService.getMyPetRequests();
       } else {
         pets = [];
       }
 
-      print('✅ Loaded ${pets.length} items');
-
       setState(() {
         _pets = pets;
-        _cachedData[_selectedTab] = pets; // Cache the data
+        _cachedData[_selectedTab] = pets;
         _isLoading = false;
       });
-    } catch (e, stackTrace) {
-      print('❌ Error loading pets: $e');
-
+    } catch (e) {
       setState(() {
         _isLoading = false;
       });
@@ -98,15 +87,10 @@ class _PetListingPageState extends State<PetListingPage> {
   }
 
   Future<void> _handleLogout() async {
-    // Clear token FIRST (most important!)
     ApiService.clearToken();
-
-    // Navigate to login screen (always works)
     if (mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     }
-
-    // Try API logout in background (ignore errors)
     try {
       await ApiService.logout();
     } catch (e) {
@@ -118,134 +102,184 @@ class _PetListingPageState extends State<PetListingPage> {
     if (_selectedTab != tab) {
       setState(() {
         _selectedTab = tab;
-        // Clear current pets when switching to prevent showing old data
         _pets = [];
       });
-      _loadPets(); // Load new data for the selected tab
+      _loadPets();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
-      appBar: AppBar(
-        // Add back button when not on main tab
-        leading: _selectedTab != 'all-pets'
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  setState(() {
-                    _selectedTab = 'all-pets';
-                  });
-                  _loadPets();
-                },
-              )
-            : null,
-        title: Text(
-          _selectedTab == 'all-pets'
-              ? 'Pet Adoption'
-              : _selectedTab == 'history'
-              ? 'History'
-              : _selectedTab == 'my-pets'
-              ? 'My Pets'
-              : _selectedTab == 'my-requests'
-              ? 'My Requests'
-              : 'Pet Requests',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
+      backgroundColor: const Color(0xFFE6F7F5),
+      body: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 480),
+          decoration: BoxDecoration(
             color: Colors.white,
-          ),
-        ),
-        backgroundColor: const Color(0xFF4FD1C7),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // Tab Navigation - ONLY show on main Pet Adoption page
-          if (_selectedTab == 'all-pets')
-            Container(
-              color: const Color(0xFF4FD1C7),
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildTabChip('History', 'history', Icons.history),
-                  _buildTabChip('My Pets', 'my-pets', Icons.pets),
-                  _buildTabChip(
-                    'My requests',
-                    'my-requests',
-                    Icons.chat_bubble_outline,
-                  ),
-                  _buildTabChip(
-                    'Pet Requests',
-                    'pet-requests',
-                    Icons.inbox_outlined,
-                  ),
-                  _buildTabChip('Log out', 'logout', Icons.logout),
-                ],
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
-            ),
-
-          // Content based on selected tab
-          Expanded(
-            child: _selectedTab == 'logout'
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF4FD1C7)),
-                  )
-                : _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF4FD1C7)),
-                  )
-                : _pets.isEmpty
-                ? _buildEmptyState()
-                : RefreshIndicator(
-                    onRefresh: () => _loadPets(forceRefresh: true),
-                    color: const Color(0xFF4FD1C7),
-                    child: _selectedTab == 'my-requests'
-                        ? _buildRequestsList()
-                        : _selectedTab == 'history'
-                        ? _buildHistoryList()
-                        : GridView.builder(
-                            padding: const EdgeInsets.all(16),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  childAspectRatio: 0.75,
-                                  crossAxisSpacing: 16,
-                                  mainAxisSpacing: 16,
-                                ),
-                            itemCount: _pets.length,
-                            itemBuilder: (context, index) {
-                              final pet = _pets[index];
-                              return _buildPetCard(pet);
+            ],
+          ),
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  // Custom Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF4FD1C7),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        if (_selectedTab != 'all-pets')
+                          IconButton(
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _selectedTab = 'all-pets';
+                              });
+                              _loadPets();
                             },
                           ),
+                        Expanded(
+                          child: Text(
+                            _selectedTab == 'all-pets'
+                                ? 'Pet Adoption'
+                                : _selectedTab == 'history'
+                                ? 'History'
+                                : _selectedTab == 'my-pets'
+                                ? 'My Pets'
+                                : _selectedTab == 'my-requests'
+                                ? 'My Requests'
+                                : 'Pet Requests',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        if (_selectedTab != 'all-pets')
+                          const SizedBox(width: 48),
+                      ],
+                    ),
                   ),
-          ),
-        ],
-      ),
-      floatingActionButton: _selectedTab == 'all-pets'
-          ? FloatingActionButton(
-              onPressed: () async {
-                // Navigate to Add Pet Page
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AddPetPage()),
-                );
 
-                if (result == true) {
-                  print('🔄 Refreshing after adding pet...');
-                  // Clear cache and force refresh
-                  _cachedData.clear();
-                  await _loadPets(forceRefresh: true);
-                }
-              },
-              backgroundColor: const Color(0xFF4FD1C7),
-              child: const Icon(Icons.add, color: Colors.white),
-            )
-          : null,
+                  // Tab Navigation
+                  if (_selectedTab == 'all-pets')
+                    Container(
+                      color: const Color(0xFF4FD1C7),
+                      padding: const EdgeInsets.only(
+                        bottom: 16,
+                        left: 12,
+                        right: 12,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildTabChip('History', 'history', Icons.history),
+                          _buildTabChip('My Pets', 'my-pets', Icons.pets),
+                          _buildTabChip(
+                            'My requests',
+                            'my-requests',
+                            Icons.chat_bubble_outline,
+                          ),
+                          _buildTabChip(
+                            'Pet Requests',
+                            'pet-requests',
+                            Icons.inbox_outlined,
+                          ),
+                          _buildTabChip('Log out', 'logout', Icons.logout),
+                        ],
+                      ),
+                    ),
+
+                  // Content
+                  Expanded(
+                    child: _selectedTab == 'logout'
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF4FD1C7),
+                            ),
+                          )
+                        : _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF4FD1C7),
+                            ),
+                          )
+                        : _pets.isEmpty
+                        ? _buildEmptyState()
+                        : RefreshIndicator(
+                            onRefresh: () => _loadPets(forceRefresh: true),
+                            color: const Color(0xFF4FD1C7),
+                            child: _selectedTab == 'my-requests'
+                                ? _buildRequestsList()
+                                : _selectedTab == 'history'
+                                ? _buildHistoryList()
+                                : ListView.builder(
+                                    padding: const EdgeInsets.all(16),
+                                    itemCount: _pets.length,
+                                    itemBuilder: (context, index) {
+                                      final pet = _pets[index];
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 16,
+                                        ),
+                                        child: _buildPetCard(pet),
+                                      );
+                                    },
+                                  ),
+                          ),
+                  ),
+                ],
+              ),
+
+              // FAB inside card
+              if (_selectedTab == 'all-pets')
+                Positioned(
+                  right: 20,
+                  bottom: 20,
+                  child: FloatingActionButton(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddPetPage(),
+                        ),
+                      );
+
+                      if (result == true) {
+                        _cachedData.clear();
+                        await _loadPets(forceRefresh: true);
+                      }
+                    },
+                    backgroundColor: const Color(0xFF4FD1C7),
+                    child: const Icon(Icons.add, color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -268,7 +302,6 @@ class _PetListingPageState extends State<PetListingPage> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Pet Image
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
@@ -299,7 +332,6 @@ class _PetListingPageState extends State<PetListingPage> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Pet Info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -351,7 +383,6 @@ class _PetListingPageState extends State<PetListingPage> {
                     ],
                   ),
                 ),
-                // Action Button
                 if (status == 'pending')
                   IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
@@ -394,7 +425,6 @@ class _PetListingPageState extends State<PetListingPage> {
     if (shouldCancel == true) {
       try {
         await ApiService.cancelAdoptionRequest(requestId);
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -403,8 +433,6 @@ class _PetListingPageState extends State<PetListingPage> {
             ),
           );
         }
-
-        // Refresh the list
         _cachedData.remove('my-requests');
         await _loadPets(forceRefresh: true);
       } catch (e) {
@@ -450,7 +478,6 @@ class _PetListingPageState extends State<PetListingPage> {
       itemCount: _pets.length,
       itemBuilder: (context, index) {
         final history = _pets[index];
-
         return Card(
           margin: const EdgeInsets.only(bottom: 16),
           elevation: 3,
@@ -464,7 +491,6 @@ class _PetListingPageState extends State<PetListingPage> {
               children: [
                 Row(
                   children: [
-                    // Pet Image
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
@@ -475,15 +501,14 @@ class _PetListingPageState extends State<PetListingPage> {
                             ? Image.network(
                                 history['image_url'],
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Center(
-                                    child: Icon(
-                                      Icons.pets,
-                                      size: 40,
-                                      color: Color(0xFF4FD1C7),
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Center(
+                                      child: Icon(
+                                        Icons.pets,
+                                        size: 40,
+                                        color: Color(0xFF4FD1C7),
+                                      ),
                                     ),
-                                  );
-                                },
                               )
                             : const Center(
                                 child: Icon(
@@ -495,7 +520,6 @@ class _PetListingPageState extends State<PetListingPage> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    // Pet Info
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,7 +550,6 @@ class _PetListingPageState extends State<PetListingPage> {
                 // Owner Transfer
                 Row(
                   children: [
-                    // Original Owner
                     Expanded(
                       child: Column(
                         children: [
@@ -563,8 +586,6 @@ class _PetListingPageState extends State<PetListingPage> {
                         ],
                       ),
                     ),
-
-                    // Arrow
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Icon(
@@ -573,8 +594,6 @@ class _PetListingPageState extends State<PetListingPage> {
                         color: const Color(0xFF4FD1C7),
                       ),
                     ),
-
-                    // New Owner
                     Expanded(
                       child: Column(
                         children: [
@@ -617,7 +636,6 @@ class _PetListingPageState extends State<PetListingPage> {
 
                 const SizedBox(height: 16),
 
-                // Status
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -693,24 +711,18 @@ class _PetListingPageState extends State<PetListingPage> {
                 ],
               ),
             );
-
-            if (shouldLogout == true) {
-              _handleLogout();
-            }
+            if (shouldLogout == true) _handleLogout();
           } else if (value == 'my-pets') {
-            // Navigate to My Pets page
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const MyPetsPage()),
             ).then((result) {
               if (result == true) {
-                // Refresh when coming back
                 _cachedData.clear();
                 _loadPets(forceRefresh: true);
               }
             });
           } else if (value == 'pet-requests') {
-            // Navigate to Pet Requests page
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const PetRequestsPage()),
@@ -721,7 +733,6 @@ class _PetListingPageState extends State<PetListingPage> {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           decoration: BoxDecoration(
@@ -777,47 +788,28 @@ class _PetListingPageState extends State<PetListingPage> {
 
   Widget _buildEmptyState() {
     String message;
-    String icon;
-
     switch (_selectedTab) {
       case 'history':
         message = 'No history yet';
-        icon = 'history';
         break;
       case 'my-pets':
         message = 'No pets posted yet';
-        icon = 'my-pets';
         break;
       case 'my-requests':
         message = 'No adoption requests yet';
-        icon = 'requests';
         break;
       case 'pet-requests':
         message = 'No pet requests received';
-        icon = 'inbox';
         break;
       default:
         message = 'No pets available';
-        icon = 'pets';
     }
 
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon == 'history'
-                ? Icons.history
-                : icon == 'my-pets'
-                ? Icons.pets
-                : icon == 'requests'
-                ? Icons.question_answer
-                : icon == 'inbox'
-                ? Icons.inbox
-                : Icons.pets,
-            size: 80,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.pets, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             message,
@@ -842,40 +834,31 @@ class _PetListingPageState extends State<PetListingPage> {
       child: Card(
         elevation: 4,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Pet Image
-            Expanded(
-              flex: 3,
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    topRight: Radius.circular(16),
-                  ),
+        child: SizedBox(
+          height: 140,
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
                 ),
-                child: pet['image'] != null || pet['image_url'] != null
-                    ? ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                        ),
-                        child: Image.network(
-                          pet['image_url'] ??
-                              'http://127.0.0.1:8000/storage/${pet['image']}',
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  color: Colors.grey[300],
+                  child: pet['image_url'] != null
+                      ? Image.network(
+                          pet['image_url'],
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Center(
-                              child: Icon(
-                                Icons.pets,
-                                size: 60,
-                                color: Color(0xFF4FD1C7),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Center(
+                                child: Icon(
+                                  Icons.pets,
+                                  size: 50,
+                                  color: Color(0xFF4FD1C7),
+                                ),
                               ),
-                            );
-                          },
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
                             return const Center(
@@ -884,68 +867,85 @@ class _PetListingPageState extends State<PetListingPage> {
                               ),
                             );
                           },
+                        )
+                      : const Center(
+                          child: Icon(
+                            Icons.pets,
+                            size: 50,
+                            color: Color(0xFF4FD1C7),
+                          ),
                         ),
-                      )
-                    : const Center(
-                        child: Icon(
-                          Icons.pets,
-                          size: 60,
-                          color: Color(0xFF4FD1C7),
-                        ),
-                      ),
+                ),
               ),
-            ),
-
-            // Pet Info
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      pet['pet_name']?.toString() ?? 'Unknown',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3748),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            pet['breed']?.toString() ?? 'Unknown breed',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pet['pet_name']?.toString() ?? 'Unknown',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2D3748),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Container(
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.pets,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  pet['breed']?.toString() ?? 'Unknown breed',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[600],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.cake,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${pet['age'] ?? 'N/A'} years',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 10,
+                              vertical: 5,
                             ),
                             decoration: BoxDecoration(
                               color: pet['listing_type'] == 'adopt'
@@ -956,7 +956,7 @@ class _PetListingPageState extends State<PetListingPage> {
                             child: Text(
                               pet['listing_type'] == 'adopt' ? 'Adopt' : 'Buy',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: pet['listing_type'] == 'adopt'
                                     ? const Color(0xFF4FD1C7)
@@ -964,32 +964,29 @@ class _PetListingPageState extends State<PetListingPage> {
                               ),
                             ),
                           ),
-                        ),
-                        if (pet['price'] != null &&
-                            (pet['price'] is num
-                                ? pet['price'] > 0
-                                : double.tryParse(pet['price'].toString()) !=
-                                          null &&
-                                      double.parse(pet['price'].toString()) >
-                                          0))
-                          Flexible(
-                            child: Text(
+                          if (pet['price'] != null &&
+                              (pet['price'] is num
+                                  ? pet['price'] > 0
+                                  : double.tryParse(pet['price'].toString()) !=
+                                            null &&
+                                        double.parse(pet['price'].toString()) >
+                                            0))
+                            Text(
                               '\$${pet['price']}',
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF4FD1C7),
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1024,6 +1021,33 @@ class _PetListingPageState extends State<PetListingPage> {
                 ),
               ),
               const SizedBox(height: 20),
+
+              // Pet Image
+              if (pet['image_url'] != null)
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: double.infinity,
+                      height: 250,
+                      color: Colors.grey[300],
+                      child: Image.network(
+                        pet['image_url'],
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Center(
+                              child: Icon(
+                                Icons.pets,
+                                size: 80,
+                                color: Color(0xFF4FD1C7),
+                              ),
+                            ),
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 20),
+
               Text(
                 pet['pet_name']?.toString() ?? 'Unknown',
                 style: const TextStyle(
@@ -1049,10 +1073,38 @@ class _PetListingPageState extends State<PetListingPage> {
                 ],
               ),
               const SizedBox(height: 20),
+
+              // Basic Info
               _buildDetailRow('Breed', pet['breed']?.toString() ?? 'Unknown'),
               _buildDetailRow('Color', pet['color']?.toString() ?? 'Unknown'),
               _buildDetailRow('Status', pet['status']?.toString() ?? 'Unknown'),
-              if (pet['description'] != null) ...[
+
+              // ✅ ADD ALLERGIES
+              if (pet['allergies'] != null &&
+                  pet['allergies'].toString().isNotEmpty)
+                _buildDetailRow(
+                  'Allergies',
+                  pet['allergies']?.toString() ?? '-',
+                ),
+
+              // ✅ ADD MEDICATIONS
+              if (pet['medications'] != null &&
+                  pet['medications'].toString().isNotEmpty)
+                _buildDetailRow(
+                  'Medications',
+                  pet['medications']?.toString() ?? '-',
+                ),
+
+              // ✅ ADD FOOD PREFERENCES
+              if (pet['food_preferences'] != null &&
+                  pet['food_preferences'].toString().isNotEmpty)
+                _buildDetailRow(
+                  'Food Preferences',
+                  pet['food_preferences']?.toString() ?? '-',
+                ),
+
+              if (pet['description'] != null &&
+                  pet['description'].toString().isNotEmpty) ...[
                 const SizedBox(height: 16),
                 const Text(
                   'Description',
@@ -1073,7 +1125,7 @@ class _PetListingPageState extends State<PetListingPage> {
                 ),
               ],
               const SizedBox(height: 24),
-              // Only show adoption button if pet doesn't belong to current user
+
               if (_currentUserId == null ||
                   pet['user_id'] != _currentUserId) ...[
                 SizedBox(
@@ -1106,7 +1158,6 @@ class _PetListingPageState extends State<PetListingPage> {
                   ),
                 ),
               ] else ...[
-                // Show "Your Pet" badge instead
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -1118,16 +1169,16 @@ class _PetListingPageState extends State<PetListingPage> {
                       width: 2,
                     ),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.check_circle,
                         color: Color(0xFF4FD1C7),
                         size: 24,
                       ),
-                      const SizedBox(width: 12),
-                      const Text(
+                      SizedBox(width: 12),
+                      Text(
                         'This is your pet',
                         style: TextStyle(
                           fontSize: 16,

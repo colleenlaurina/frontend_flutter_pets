@@ -37,6 +37,9 @@ class _MyPetsPageState extends State<MyPetsPage> {
       print('✅ SUCCESS! Loaded ${pets.length} pets');
       print('📊 Pets data: $pets');
 
+      // ✅ ADD THIS CHECK
+      if (!mounted) return;
+
       setState(() {
         _myPets = pets;
         _isLoading = false;
@@ -49,6 +52,8 @@ class _MyPetsPageState extends State<MyPetsPage> {
       print('Stack trace:');
       print(stackTrace);
       print('=====================================');
+
+      if (!mounted) return;
 
       setState(() {
         _isLoading = false;
@@ -72,7 +77,6 @@ class _MyPetsPageState extends State<MyPetsPage> {
       MaterialPageRoute(builder: (context) => EditPetPage(pet: pet)),
     );
 
-    // If edit was successful, reload the list
     if (result == true) {
       _loadMyPets();
     }
@@ -143,46 +147,91 @@ class _MyPetsPageState extends State<MyPetsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
-      appBar: AppBar(
-        title: const Text(
-          'My Pets',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF4FD1C7),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context, true);
-          },
+      backgroundColor: const Color(0xFFE6F7F5),
+      body: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 480),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4FD1C7),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () {
+                        Navigator.pop(context, true);
+                      },
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'My Pets',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF4FD1C7),
+                        ),
+                      )
+                    : _myPets.isEmpty
+                    ? _buildEmptyState()
+                    : RefreshIndicator(
+                        onRefresh: _loadMyPets,
+                        color: const Color(0xFF4FD1C7),
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.75,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                              ),
+                          itemCount: _myPets.length,
+                          itemBuilder: (context, index) {
+                            final pet = _myPets[index];
+                            return _buildPetCard(pet);
+                          },
+                        ),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF4FD1C7)),
-            )
-          : _myPets.isEmpty
-          ? _buildEmptyState()
-          : RefreshIndicator(
-              onRefresh: _loadMyPets,
-              color: const Color(0xFF4FD1C7),
-              child: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.75,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemCount: _myPets.length,
-                itemBuilder: (context, index) {
-                  final pet = _myPets[index];
-                  return _buildPetCard(pet);
-                },
-              ),
-            ),
     );
   }
 
@@ -255,8 +304,7 @@ class _MyPetsPageState extends State<MyPetsPage> {
                               topRight: Radius.circular(16),
                             ),
                             child: Image.network(
-                              pet['image_url'] ??
-                                  'http://127.0.0.1:8000/storage/${pet['image']}',
+                              pet['image_url'] ?? pet['image'] ?? '',
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return const Center(
@@ -287,7 +335,6 @@ class _MyPetsPageState extends State<MyPetsPage> {
                           ),
                   ),
                 ),
-
                 Expanded(
                   flex: 2,
                   child: Padding(
@@ -382,14 +429,11 @@ class _MyPetsPageState extends State<MyPetsPage> {
               ],
             ),
           ),
-
-          // Edit and Delete buttons
           Positioned(
             top: 8,
             right: 8,
             child: Row(
               children: [
-                // Edit button
                 GestureDetector(
                   onTap: () => _editPet(pet),
                   child: Container(
@@ -414,7 +458,6 @@ class _MyPetsPageState extends State<MyPetsPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Delete button
                 GestureDetector(
                   onTap: () => _deletePet(
                     pet['id'],

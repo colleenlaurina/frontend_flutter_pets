@@ -4,14 +4,11 @@ import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Using 127.0.0.1 for web browser or iOS simulator
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static const String baseUrl = 'http://172.20.10.9:8000/api';
   static const String _tokenKey = 'auth_token';
 
-  // Store the authentication token
   static String? _token;
 
-  // Set token after login (saves to SharedPreferences)
   static Future<void> setToken(String token) async {
     _token = token;
     final prefs = await SharedPreferences.getInstance();
@@ -19,14 +16,11 @@ class ApiService {
     print('✅ Token saved: $_token');
   }
 
-  // Get token (retrieves from SharedPreferences if not in memory)
   static Future<String?> getToken() async {
-    // If token is in memory, return it
     if (_token != null) {
       return _token;
     }
 
-    // Try to get from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_tokenKey);
 
@@ -37,7 +31,6 @@ class ApiService {
     return _token;
   }
 
-  // Clear token on logout
   static Future<void> clearToken() async {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
@@ -45,7 +38,6 @@ class ApiService {
     print('🗑️ Token cleared');
   }
 
-  // Helper method to get headers
   static Future<Map<String, String>> _getHeaders({
     bool requiresAuth = false,
   }) async {
@@ -67,10 +59,6 @@ class ApiService {
     return headers;
   }
 
-  // ==================== AUTH ENDPOINTS ====================
-
-  /// Register a new user
-  /// POST /api/register
   static Future<Map<String, dynamic>> register({
     required String name,
     required String email,
@@ -102,8 +90,6 @@ class ApiService {
     }
   }
 
-  /// Login user
-  /// POST /api/login
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -118,7 +104,6 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Save the token
         if (data['data'] != null && data['data']['token'] != null) {
           await setToken(data['data']['token']);
           print('✅ Login successful! Token saved.');
@@ -134,8 +119,6 @@ class ApiService {
     }
   }
 
-  /// Logout user
-  /// POST /api/logout
   static Future<Map<String, dynamic>> logout() async {
     try {
       final response = await http.post(
@@ -154,8 +137,6 @@ class ApiService {
     }
   }
 
-  /// Get current user
-  /// GET /api/me
   static Future<Map<String, dynamic>> getCurrentUser() async {
     try {
       final response = await http.get(
@@ -173,10 +154,6 @@ class ApiService {
     }
   }
 
-  // ==================== PET LISTING ENDPOINTS ====================
-
-  /// Get all pet listings (PUBLIC)
-  /// GET /api/pets
   static Future<List<dynamic>> getPetListings({
     String? category,
     String? search,
@@ -184,7 +161,6 @@ class ApiService {
     try {
       String url = '$baseUrl/pets';
 
-      // Add query parameters if provided
       List<String> queryParams = [];
       if (category != null) queryParams.add('category=$category');
       if (search != null) queryParams.add('search=$search');
@@ -208,8 +184,6 @@ class ApiService {
     }
   }
 
-  /// Get single pet listing by ID (PUBLIC)
-  /// GET /api/pets/{id}
   static Future<Map<String, dynamic>> getPetById(int id) async {
     try {
       final response = await http.get(
@@ -227,8 +201,6 @@ class ApiService {
     }
   }
 
-  /// Get user's own pets (PROTECTED)
-  /// GET /api/my-pets
   static Future<List<dynamic>> getMyPets() async {
     try {
       final response = await http.get(
@@ -246,8 +218,6 @@ class ApiService {
     }
   }
 
-  /// Create new pet listing (PROTECTED)
-  /// POST /api/pets
   static Future<Map<String, dynamic>> createPetListing({
     required String petName,
     required String category,
@@ -275,13 +245,11 @@ class ApiService {
 
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/pets'));
 
-      // Add headers with authentication
       request.headers['Authorization'] = 'Bearer $token';
       request.headers['Accept'] = 'application/json';
 
       print('📤 Request headers: ${request.headers}');
 
-      // Add fields
       request.fields['pet_name'] = petName;
       request.fields['category'] = category;
       if (age != null) request.fields['age'] = age.toString();
@@ -294,13 +262,12 @@ class ApiService {
       request.fields['status'] = status;
       if (allergies != null) request.fields['allergies'] = allergies;
       if (medications != null) request.fields['medications'] = medications;
-      if (foodPreferences != null)
+      if (foodPreferences != null) {
         request.fields['food_preferences'] = foodPreferences;
+      }
 
-      // Add image if provided
       if (imagePath != null && imagePath.isNotEmpty) {
         try {
-          // For web, we need to use fromBytes instead of fromPath
           final bytes = await http.readBytes(Uri.parse(imagePath));
           var file = http.MultipartFile.fromBytes(
             'image',
@@ -311,7 +278,6 @@ class ApiService {
           request.files.add(file);
         } catch (e) {
           print('⚠️ Failed to add image: $e');
-          // Continue without image if it fails
         }
       }
 
@@ -333,8 +299,6 @@ class ApiService {
     }
   }
 
-  /// Update pet listing (PROTECTED)
-  /// POST /api/pets/{id}
   static Future<Map<String, dynamic>> updatePetListing({
     required int id,
     required String petName,
@@ -383,8 +347,6 @@ class ApiService {
     }
   }
 
-  /// Delete pet listing (PROTECTED)
-  /// DELETE /api/pets/{id}
   static Future<Map<String, dynamic>> deletePetListing(int id) async {
     try {
       final response = await http.delete(
@@ -403,10 +365,6 @@ class ApiService {
     }
   }
 
-  // ==================== ADOPTION REQUEST ENDPOINTS ====================
-
-  /// Get user's adoption requests (PROTECTED)
-  /// GET /api/my-adoption-requests
   static Future<List<dynamic>> getMyRequests() async {
     try {
       final response = await http.get(
@@ -424,8 +382,6 @@ class ApiService {
     }
   }
 
-  /// Get requests for user's pets (PROTECTED)
-  /// GET /api/my-pet-requests
   static Future<List<dynamic>> getReceivedRequests() async {
     try {
       final response = await http.get(
@@ -443,8 +399,6 @@ class ApiService {
     }
   }
 
-  /// Submit adoption request (PROTECTED)
-  /// POST /api/adoption-requests
   static Future<Map<String, dynamic>> submitAdoptionRequest({
     required int petId,
     required String message,
@@ -467,8 +421,6 @@ class ApiService {
     }
   }
 
-  /// Approve adoption request (PROTECTED - Pet Owner)
-  /// POST /api/pet-requests/{id}/approve
   static Future<Map<String, dynamic>> approveRequest(int requestId) async {
     try {
       final response = await http.post(
@@ -487,8 +439,6 @@ class ApiService {
     }
   }
 
-  /// Reject adoption request (PROTECTED - Pet Owner)
-  /// POST /api/pet-requests/{id}/reject
   static Future<Map<String, dynamic>> rejectRequest({
     required int requestId,
     required String ownerNotes,
@@ -511,8 +461,6 @@ class ApiService {
     }
   }
 
-  /// Cancel adoption request (PROTECTED - Requester)
-  /// DELETE /api/adoption-requests/{id}
   static Future<Map<String, dynamic>> cancelRequest(int requestId) async {
     try {
       final response = await http.delete(
@@ -531,10 +479,6 @@ class ApiService {
     }
   }
 
-  // ==================== HISTORY ENDPOINTS ====================
-
-  /// Get adoption history (PROTECTED)
-  /// GET /api/my-adoption-history
   static Future<List<dynamic>> getAdoptionHistory() async {
     try {
       final response = await http.get(
@@ -552,10 +496,6 @@ class ApiService {
     }
   }
 
-  // ==================== TEST ENDPOINT ====================
-
-  /// Test API connection
-  /// GET /api/test
   static Future<Map<String, dynamic>> testConnection() async {
     try {
       final response = await http.get(

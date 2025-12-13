@@ -27,6 +27,7 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
       final requests = await ApiService.getMyPetRequests();
 
       print('📥 Loaded ${requests.length} requests');
+      print('🔍 Pet Requests Data: $requests');
 
       setState(() {
         _requests = requests;
@@ -56,7 +57,6 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
     try {
       print('✅ Approving request ID: $requestId');
 
-      // Show loading
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -78,7 +78,6 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
         );
       }
 
-      // Refresh the list
       await _loadRequests();
     } catch (e) {
       print('❌ Error approving request: $e');
@@ -100,7 +99,6 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
     try {
       print('❌ Rejecting request ID: $requestId');
 
-      // Show loading
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -122,7 +120,6 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
         );
       }
 
-      // Refresh the list
       await _loadRequests();
     } catch (e) {
       print('❌ Error rejecting request: $e');
@@ -143,33 +140,82 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
-      appBar: AppBar(
-        title: const Text(
-          'Pet Requests',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF4FD1C7),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF4FD1C7)),
-            )
-          : _requests.isEmpty
-          ? _buildEmptyState()
-          : RefreshIndicator(
-              onRefresh: _loadRequests,
-              color: const Color(0xFF4FD1C7),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _requests.length,
-                itemBuilder: (context, index) {
-                  final request = _requests[index];
-                  return _buildRequestCard(request);
-                },
+      backgroundColor: const Color(0xFFE6F7F5),
+      body: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 480),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
-            ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4FD1C7),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Pet Requests',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF4FD1C7),
+                        ),
+                      )
+                    : _requests.isEmpty
+                    ? _buildEmptyState()
+                    : RefreshIndicator(
+                        onRefresh: _loadRequests,
+                        color: const Color(0xFF4FD1C7),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _requests.length,
+                          itemBuilder: (context, index) {
+                            final request = _requests[index];
+                            return _buildRequestCard(request);
+                          },
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -195,12 +241,24 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
   }
 
   Widget _buildRequestCard(dynamic request) {
+    print('🔍 Building card for request: $request');
+
     final pet = request['pet'];
     final user = request['user'];
     final status = request['status'];
     final isPending = status == 'pending';
 
-    // Safely get request ID and convert to int
+    // ✅ NULL CHECKS
+    if (pet == null) {
+      print('⚠️ Pet is null in request: $request');
+      return const SizedBox.shrink();
+    }
+
+    if (user == null) {
+      print('⚠️ User is null in request: $request');
+      return const SizedBox.shrink();
+    }
+
     int requestId;
     try {
       requestId = request['id'] is int
@@ -208,7 +266,7 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
           : int.parse(request['id'].toString());
     } catch (e) {
       print('❌ Error parsing request ID: ${request['id']}');
-      requestId = 0; // fallback
+      requestId = 0;
     }
 
     return Card(

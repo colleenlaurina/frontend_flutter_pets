@@ -123,7 +123,7 @@ import 'package:flutter/material.dart';
 class AccToggle extends StatefulWidget {
   final Function(String) onRoleChanged;
 
-  const AccToggle({Key? key, required this.onRoleChanged}) : super(key: key);
+  const AccToggle({super.key, required this.onRoleChanged});
 
   @override
   _AccToggleState createState() => _AccToggleState();

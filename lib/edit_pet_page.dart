@@ -16,7 +16,6 @@ class EditPetPage extends StatefulWidget {
 class _EditPetPageState extends State<EditPetPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers - pre-filled with existing data
   late final TextEditingController _petNameController;
   late final TextEditingController _breedController;
   late final TextEditingController _ageController;
@@ -32,7 +31,7 @@ class _EditPetPageState extends State<EditPetPage> {
   String _selectedListingType = 'adopt';
   String _selectedStatus = 'available';
 
-  File? _selectedImage;
+  XFile? _selectedImage;
   String? _existingImageUrl;
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
@@ -41,7 +40,6 @@ class _EditPetPageState extends State<EditPetPage> {
   void initState() {
     super.initState();
 
-    // Initialize controllers with existing pet data
     _petNameController = TextEditingController(
       text: widget.pet['pet_name']?.toString() ?? '',
     );
@@ -70,7 +68,6 @@ class _EditPetPageState extends State<EditPetPage> {
       text: widget.pet['food_preferences']?.toString() ?? '',
     );
 
-    // Set existing values
     _selectedCategory = widget.pet['category']?.toString() ?? 'dog';
     _selectedGender = widget.pet['gender']?.toString() ?? 'male';
     _selectedListingType = widget.pet['listing_type']?.toString() ?? 'adopt';
@@ -103,7 +100,7 @@ class _EditPetPageState extends State<EditPetPage> {
 
       if (image != null) {
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImage = XFile(image.path);
         });
       }
     } catch (e) {
@@ -164,7 +161,6 @@ class _EditPetPageState extends State<EditPetPage> {
           ),
         );
 
-        // Go back to My Pets page
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -187,259 +183,306 @@ class _EditPetPageState extends State<EditPetPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
-      appBar: AppBar(
-        title: const Text(
-          'Edit Pet',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF4FD1C7),
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-      ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF4FD1C7)),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: const Color(0xFFE6F7F5),
+      body: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 480),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4FD1C7),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Row(
                   children: [
-                    // Image Section
-                    Center(
-                      child: GestureDetector(
-                        onTap: _pickImage,
-                        child: Container(
-                          width: double.infinity,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFF4FD1C7),
-                              width: 2,
-                            ),
-                          ),
-                          child: _selectedImage != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: kIsWeb
-                                      ? Image.network(
-                                          _selectedImage!.path,
-                                          fit: BoxFit.cover,
-                                        )
-                                      : Image.file(
-                                          _selectedImage!,
-                                          fit: BoxFit.cover,
-                                        ),
-                                )
-                              : _existingImageUrl != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: Image.network(
-                                    _existingImageUrl!,
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                              : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.add_photo_alternate,
-                                      size: 50,
-                                      color: Colors.grey[400],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Tap to change image',
-                                      style: TextStyle(color: Colors.grey[600]),
-                                    ),
-                                  ],
-                                ),
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Edit Pet',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Pet Name
-                    _buildTextField(
-                      controller: _petNameController,
-                      label: 'Pet Name',
-                      icon: Icons.pets,
-                      validator: (value) => value?.isEmpty ?? true
-                          ? 'Please enter pet name'
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Category
-                    _buildDropdown(
-                      label: 'Category',
-                      value: _selectedCategory,
-                      items: const ['dog', 'cat'],
-                      onChanged: (value) =>
-                          setState(() => _selectedCategory = value!),
-                      icon: Icons.category,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Breed
-                    _buildTextField(
-                      controller: _breedController,
-                      label: 'Breed',
-                      icon: Icons.pets,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Age & Gender Row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _ageController,
-                            label: 'Age (years)',
-                            icon: Icons.cake,
-                            keyboardType: TextInputType.number,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildDropdown(
-                            label: 'Gender',
-                            value: _selectedGender,
-                            items: const ['male', 'female'],
-                            onChanged: (value) =>
-                                setState(() => _selectedGender = value!),
-                            icon: Icons.wc,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Color
-                    _buildTextField(
-                      controller: _colorController,
-                      label: 'Color',
-                      icon: Icons.palette,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Description
-                    _buildTextField(
-                      controller: _descriptionController,
-                      label: 'Description',
-                      icon: Icons.description,
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Listing Type & Status
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildDropdown(
-                            label: 'Listing Type',
-                            value: _selectedListingType,
-                            items: const ['adopt', 'sell'],
-                            onChanged: (value) =>
-                                setState(() => _selectedListingType = value!),
-                            icon: Icons.type_specimen,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildDropdown(
-                            label: 'Status',
-                            value: _selectedStatus,
-                            items: const ['available', 'adopted'],
-                            onChanged: (value) =>
-                                setState(() => _selectedStatus = value!),
-                            icon: Icons.check_circle,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Price
-                    _buildTextField(
-                      controller: _priceController,
-                      label: 'Price (\$)',
-                      icon: Icons.attach_money,
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty)
-                          return 'Please enter price';
-                        if (double.tryParse(value) == null)
-                          return 'Please enter valid number';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Optional Fields
-                    Text(
-                      'Optional Information',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    _buildTextField(
-                      controller: _allergiesController,
-                      label: 'Allergies',
-                      icon: Icons.healing,
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildTextField(
-                      controller: _medicationsController,
-                      label: 'Medications',
-                      icon: Icons.medical_services,
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildTextField(
-                      controller: _foodPreferencesController,
-                      label: 'Food Preferences',
-                      icon: Icons.restaurant,
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Update Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: _updatePet,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4FD1C7),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: const Text(
-                          'Update Pet',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    const SizedBox(width: 48),
                   ],
                 ),
               ),
-            ),
+              Expanded(
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF4FD1C7),
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Center(
+                                child: GestureDetector(
+                                  onTap: _pickImage,
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 200,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: const Color(0xFF4FD1C7),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: _selectedImage != null
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            child: kIsWeb
+                                                ? Image.network(
+                                                    _selectedImage!.path,
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                : Image.network(
+                                                    _selectedImage!.path,
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                          )
+                                        : _existingImageUrl != null
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                            child: Image.network(
+                                              _existingImageUrl!,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          )
+                                        : Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.add_photo_alternate,
+                                                size: 50,
+                                                color: Colors.grey[400],
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Tap to change image',
+                                                style: TextStyle(
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+
+                              _buildTextField(
+                                controller: _petNameController,
+                                label: 'Pet Name',
+                                icon: Icons.pets,
+                                validator: (value) => value?.isEmpty ?? true
+                                    ? 'Please enter pet name'
+                                    : null,
+                              ),
+                              const SizedBox(height: 16),
+
+                              _buildDropdown(
+                                label: 'Category',
+                                value: _selectedCategory,
+                                items: const ['dog', 'cat'],
+                                onChanged: (value) =>
+                                    setState(() => _selectedCategory = value!),
+                                icon: Icons.category,
+                              ),
+                              const SizedBox(height: 16),
+
+                              _buildTextField(
+                                controller: _breedController,
+                                label: 'Breed',
+                                icon: Icons.pets,
+                              ),
+                              const SizedBox(height: 16),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildTextField(
+                                      controller: _ageController,
+                                      label: 'Age (years)',
+                                      icon: Icons.cake,
+                                      keyboardType: TextInputType.number,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _buildDropdown(
+                                      label: 'Gender',
+                                      value: _selectedGender,
+                                      items: const ['male', 'female'],
+                                      onChanged: (value) => setState(
+                                        () => _selectedGender = value!,
+                                      ),
+                                      icon: Icons.wc,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+
+                              _buildTextField(
+                                controller: _colorController,
+                                label: 'Color',
+                                icon: Icons.palette,
+                              ),
+                              const SizedBox(height: 16),
+
+                              _buildTextField(
+                                controller: _descriptionController,
+                                label: 'Description',
+                                icon: Icons.description,
+                                maxLines: 3,
+                              ),
+                              const SizedBox(height: 16),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildDropdown(
+                                      label: 'Listing Type',
+                                      value: _selectedListingType,
+                                      items: const ['adopt', 'sell'],
+                                      onChanged: (value) => setState(
+                                        () => _selectedListingType = value!,
+                                      ),
+                                      icon: Icons.type_specimen,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _buildDropdown(
+                                      label: 'Status',
+                                      value: _selectedStatus,
+                                      items: const ['available', 'adopted'],
+                                      onChanged: (value) => setState(
+                                        () => _selectedStatus = value!,
+                                      ),
+                                      icon: Icons.check_circle,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+
+                              _buildTextField(
+                                controller: _priceController,
+                                label: 'Price (\$)',
+                                icon: Icons.attach_money,
+                                keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty)
+                                    return 'Please enter price';
+                                  if (double.tryParse(value) == null)
+                                    return 'Please enter valid number';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+
+                              Text(
+                                'Optional Information',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              _buildTextField(
+                                controller: _allergiesController,
+                                label: 'Allergies',
+                                icon: Icons.healing,
+                              ),
+                              const SizedBox(height: 16),
+
+                              _buildTextField(
+                                controller: _medicationsController,
+                                label: 'Medications',
+                                icon: Icons.medical_services,
+                              ),
+                              const SizedBox(height: 16),
+
+                              _buildTextField(
+                                controller: _foodPreferencesController,
+                                label: 'Food Preferences',
+                                icon: Icons.restaurant,
+                              ),
+                              const SizedBox(height: 32),
+
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton(
+                                  onPressed: _updatePet,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF4FD1C7),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Update Pet',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

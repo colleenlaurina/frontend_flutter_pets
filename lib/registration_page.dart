@@ -3,6 +3,8 @@ import 'widgets/acctoggle.dart';
 import 'services/api_service.dart'; // Import the API service
 
 class RegistrationPage extends StatefulWidget {
+  const RegistrationPage({super.key});
+
   @override
   _RegistrationPageState createState() => _RegistrationPageState();
 }
@@ -15,7 +17,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _isAdmin = false;
+  final bool _isAdmin = false;
   String _selectedRole = '';
   bool _isLoading = false; // Loading state
   bool _agreeToTerms = false;
@@ -439,7 +441,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   }
 
   Widget _buildPawPrint({required double size, required double opacity}) {
-    return Container(
+    return SizedBox(
       width: size,
       height: size,
       child: Icon(
