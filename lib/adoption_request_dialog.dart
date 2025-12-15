@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 // ✅ STEP 1: Info Dialog
 class AdoptionInfoDialog extends StatelessWidget {
@@ -470,9 +471,15 @@ class _AdoptionRequestDialogState extends State<AdoptionRequestDialog> {
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
+                  maxLength: 11,
+                  inputFormatters: [
+                    FilteringTextInputFormatter
+                        .digitsOnly, // Only allows numbers
+                  ], // Limit to 11 digits
                   decoration: InputDecoration(
                     hintText: 'e.g., 09171234567',
                     prefixIcon: const Icon(Icons.phone),
+                    counterText: '', // Hide the counter "0/11" text
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -492,8 +499,11 @@ class _AdoptionRequestDialogState extends State<AdoptionRequestDialog> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Phone number is required';
                     }
-                    if (value.trim().length < 10) {
-                      return 'Please enter a valid phone number';
+                    if (value.trim().length != 11) {
+                      return 'Phone number must be exactly 11 digits';
+                    }
+                    if (!RegExp(r'^[0-9]+$').hasMatch(value.trim())) {
+                      return 'Phone number must contain only numbers';
                     }
                     return null;
                   },
