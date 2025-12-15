@@ -1,5 +1,90 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// ✅ ADD THIS - Simple image loader
+class SimpleApiImage extends StatefulWidget {
+  final String? imageUrl;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+
+  const SimpleApiImage({
+    Key? key,
+    required this.imageUrl,
+    this.width,
+    this.height,
+    this.fit = BoxFit.cover,
+  }) : super(key: key);
+
+  @override
+  State<SimpleApiImage> createState() => _SimpleApiImageState();
+}
+
+class _SimpleApiImageState extends State<SimpleApiImage> {
+  String? _token;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadToken();
+  }
+
+  Future<void> _loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _token = prefs.getString('token');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.imageUrl == null || widget.imageUrl!.isEmpty) {
+      return Container(
+        width: widget.width,
+        height: widget.height,
+        color: Colors.grey[200],
+        child: const Icon(Icons.pets, size: 40, color: Color(0xFF4FD1C7)),
+      );
+    }
+
+    final cleanUrl = widget.imageUrl!.trim().replaceAll('\n', '');
+
+    // Build headers with auth token if available
+    final headers = <String, String>{'Accept': 'image/*'};
+    if (_token != null) {
+      headers['Authorization'] = 'Bearer $_token';
+    }
+
+    return Image.network(
+      cleanUrl,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
+      headers: headers,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          color: Colors.grey[100],
+          child: const Center(
+            child: CircularProgressIndicator(color: Color(0xFF4FD1C7)),
+          ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        print('❌ Image load error: $error');
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          color: Colors.grey[300],
+          child: const Icon(Icons.pets, size: 40, color: Color(0xFF4FD1C7)),
+        );
+      },
+    );
+  }
+}
 
 class PetRequestsPage extends StatefulWidget {
   const PetRequestsPage({super.key});
@@ -248,14 +333,23 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
     final status = request['status'];
     final isPending = status == 'pending';
 
-    // ✅ NULL CHECKS
+    final applicantName =
+        request['applicant_name'] ?? user?['name'] ?? 'Unknown';
+    final phoneNumber = request['phone_number'] ?? 'No phone provided';
+    final validId1Url = request['valid_id_1_url']?.toString().replaceAll(
+      RegExp(r'\s+'),
+      '',
+    );
+    final validId2Url = request['valid_id_2_url']?.toString().replaceAll(
+      RegExp(r'\s+'),
+      '',
+    );
+
+    print('🖼️ Valid ID 1 URL: $validId1Url');
+    print('🖼️ Valid ID 2 URL: $validId2Url');
+
     if (pet == null) {
       print('⚠️ Pet is null in request: $request');
-      return const SizedBox.shrink();
-    }
-
-    if (user == null) {
-      print('⚠️ User is null in request: $request');
       return const SizedBox.shrink();
     }
 
@@ -282,35 +376,12 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: pet['image_url'] != null
-                      ? Image.network(
-                          pet['image_url'],
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              width: 80,
-                              height: 80,
-                              color: Colors.grey[300],
-                              child: const Icon(
-                                Icons.pets,
-                                size: 40,
-                                color: Color(0xFF4FD1C7),
-                              ),
-                            );
-                          },
-                        )
-                      : Container(
-                          width: 80,
-                          height: 80,
-                          color: Colors.grey[300],
-                          child: const Icon(
-                            Icons.pets,
-                            size: 40,
-                            color: Color(0xFF4FD1C7),
-                          ),
-                        ),
+                  child: SimpleApiImage(
+                    imageUrl: pet['image_url'],
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -327,8 +398,22 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Requested by: ${user['name'] ?? 'Unknown'}',
+                        'Requested by: $applicantName',
                         style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.phone, size: 14, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Text(
+                            phoneNumber,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       _buildStatusBadge(status),
@@ -363,6 +448,71 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
                 ],
               ),
             ),
+            if (validId1Url != null || validId2Url != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Valid IDs:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (validId1Url != null)
+                    Expanded(
+                      child: InkWell(
+                        onTap: () =>
+                            _showImageDialog(validId1Url, 'Valid ID #1'),
+                        child: Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SimpleApiImage(
+                              imageUrl: validId1Url,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (validId1Url != null && validId2Url != null)
+                    const SizedBox(width: 8),
+                  if (validId2Url != null)
+                    Expanded(
+                      child: InkWell(
+                        onTap: () =>
+                            _showImageDialog(validId2Url, 'Valid ID #2'),
+                        child: Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SimpleApiImage(
+                              imageUrl: validId2Url,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tap to view full size',
+                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              ),
+            ],
             if (isPending) ...[
               const SizedBox(height: 16),
               Row(
@@ -405,6 +555,43 @@ class _PetRequestsPageState extends State<PetRequestsPage> {
                 ],
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showImageDialog(String imageUrl, String title) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            InteractiveViewer(
+              child: SimpleApiImage(imageUrl: imageUrl, fit: BoxFit.contain),
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

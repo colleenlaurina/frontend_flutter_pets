@@ -520,14 +520,28 @@ class ApiService {
   // ✅ SIMPLIFIED - No deletion for now since backend doesn't have it
   static Future<Map<String, dynamic>> cancelAdoptionRequest(int id) async {
     try {
-      // ✅ Backend doesn't have DELETE /adoption-requests/{id}
-      // Return a fake success for now
-      print('⚠️ Cancel endpoint not implemented in backend yet');
+      print('🚫 Canceling request ID: $id');
 
-      // You can implement this later when backend is ready
-      throw Exception('Cancel feature not available yet');
+      final headers = await _getHeaders(requiresAuth: true);
+      final response = await http
+          .delete(Uri.parse('$baseUrl/adoption-requests/$id'), headers: headers)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw Exception('Connection timeout'),
+          );
+
+      print('📥 Cancel Response: ${response.statusCode}');
+      print('📥 Cancel Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['message'] ?? 'Failed to cancel request');
+      }
     } catch (e) {
-      throw Exception('Error: ${e.toString()}');
+      print('❌ Cancel error: $e');
+      throw Exception('Error canceling request: ${e.toString()}');
     }
   }
 
